@@ -12,5 +12,5 @@ def genpw():
 
 # To do: add another *safe password generator
 # contains 8 - 12 strings, with (1)caps, (2)small letters, (3) numbers, (4)1 or 2 punctuation
-# def gensafepw():
+# def genpw_safe():
 #     pw_length = [8,12]
