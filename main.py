@@ -1,14 +1,18 @@
 # Python program to manage login passwords
 
-from sys import path
 import pyperclip
 import sqlite3
 from pw_gen import pwgen
 import tldextract
 import argparse
 
-print("***Python Password Manager***")
-db_path = r"d:\py_prjs\database\pwmngr.db"
+from pw_encrypt import key_pw
+
+from sys import platform
+if platform.startswith("linux"):
+    db_path = r"~/_database/pwmngr.db"
+elif platform.startswith("win32"):
+    db_path = r"d:\py_prjs\database\pwmngr.db"
 conn = sqlite3.connect(db_path)
 
 parse = argparse.ArgumentParser()
@@ -91,6 +95,8 @@ def insert_db(url_in, pw_in):
     curs.execute("INSERT INTO pwtable VALUES (?,?)", (url_in, pw_in))
     conn.commit()
 
+print("***Python Password Manager***")
+
 if args.setup:
     curs = conn.cursor()
     curs.execute("""
@@ -112,8 +118,9 @@ while True:
             user_opt = input(f"New web site detected: {url_read}\n(1)Create new entry, or <q> to quit.\n(Otherwise)Search again.\n")
             if user_opt == "1":
                 new_pw = pwgen()
+                pyperclip.copy(new_pw)
                 insert_db(url_read,new_pw)
-                print(f"New entry created for {url_read}\nPassword:||  {new_pw}  ||")
+                print(f"New entry created for {url_read}\nPassword:||  {new_pw}  || copied to clipboard!")
                 break
             elif user_opt == "Q" or user_opt == "q":
                 break
