@@ -3,7 +3,7 @@
 import pyperclip
 import sqlite3
 
-from pw_gen import pwgen
+from pw_gen import pwgen, pwgen_custom
 import tldextract
 import argparse
 from shutil import copy2
@@ -48,13 +48,6 @@ if args.debug:
     inserts_db(list1)
 #######################################
 
-def show_all():
-    curs = conn.cursor()
-    curs.execute("SELECT * FROM pwtable")
-    data_row = curs.fetchall()
-    print(*data_row,sep="\n")
-    conn.commit()
-
 def insert_db(url_in, login_in, remark_in, pw_in):
     curs = conn.cursor()
     curs.execute("INSERT INTO pwtable VALUES (?,?,?,?)", (url_in, login_in, remark_in, pw_in))
@@ -82,32 +75,30 @@ def update_db(url_in, data_in, opt):
     conn.commit()
 
 def update_retrieve():
-    user_opt = " "
-    while user_opt != "1" and user_opt != "2" and user_opt != "3":
-        print(f"Record found. Login ID: {s_result['login']}  (Note: {s_result['re']}).")
-        user_opt = input("(1)Retrieve password. (2)Generate new password & update the record. (3)Update database Login ID and note.==> ")
-        if user_opt == "1":
-            pyperclip.copy(s_result["pw"])
-            print("Password copied to clipboard!")
-        elif user_opt == "2":
-            new_pw = pwgen()
-            new_pw_enc = str_encrypt(new_pw, key_read(), "en")
-            update_db(domain, new_pw_enc, "pw")
-            pyperclip.copy(new_pw)
-            print(f"Password for {domain} (Note: {s_result['re']}) updated and copied to clipboard!\nLogin & Password are: {s_result['login']}:|  {new_pw}  |")
-        elif user_opt == "3":
-            update_input = input("Input new Login ID and note (separated by ';'): ")
-            if update_input != "":
-                update_in = update_input.split(";", 1)
-                update_db(domain, update_in[0].strip(), "log")
-                if update_in[1]: update_db(domain, update_in[1].strip(), "re")
-                print(f"Database updated for {domain} (Note: {search_db(domain)['re']}), Login ID: {search_db(domain)['login']}")
-        else:
-            print("Error, please enter 1, 2 or 3.")
+    user_opt = input("(1)Retrieve password (2)Generate new password (3)OR custom password (4)Update database Login ID and note ==> ")
+    if user_opt == "1":
+        pyperclip.copy(s_result["pw"])
+        print("Password copied to clipboard!")
+    elif user_opt == "2" or user_opt == "3":
+        if user_opt == "2": new_pw = pwgen()
+        else: new_pw = pwgen_custom()
+        new_pw_enc = str_encrypt(new_pw, key_read(), "en")
+        update_db(domain, new_pw_enc, "pw")
+        pyperclip.copy(new_pw)
+        print(f"Password for {domain} (Note: {s_result['re']}) updated and copied to clipboard!\nLogin & Password are: {s_result['login']}:|  {new_pw}  |")
+    elif user_opt == "4":
+        update_input = input("Input new Login ID and note (separated by ';'): ")
+        if update_input != "":
+            update_in = update_input.split(";", 1)
+            update_db(domain, update_in[0].strip(), "log")
+            if update_in[1]: update_db(domain, update_in[1].strip(), "re")
+            print(f"Database updated for {domain} (Note: {search_db(domain)['re']}), Login ID: {search_db(domain)['login']}")
+    else:
+        print("Error, please enter 1, 2 or 3.")
 
 def delete_db():
     # add code here
-    return
+    return True
 
 
 print("***Python Password Manager***")
@@ -170,7 +161,7 @@ try:
             continue
         s_result = search_db(domain)
         if not s_result: # new and create entry
-            user_opt = input(f"New web site detected: {domain}\n(1)Create new entry,\n(Otherwise)Search again.\n")
+            user_opt = input(f"New web site detected: {domain}\n(1)Create new entry, (Otherwise)Search again. ==> ")
             if user_opt == "1":
                 new_login = input(f"Login id/email for {domain}: ")
                 new_remark = input(f"Additional note: ")
@@ -181,6 +172,7 @@ try:
                 print(f"New entry created for {domain}\nLogin & Password are: {new_login}:|  {new_pw}  | Password copied to clipboard!")
             else: continue
         else: # old record found
+            print(f"Record found. Login ID: {s_result['login']}  (Note: {s_result['re']}).")
             update_retrieve() # update or retrieve
 except Exception as err:
     print("Exception: ", err)

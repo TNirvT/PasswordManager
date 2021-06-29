@@ -7,6 +7,7 @@ from sys import platform
 import base64
 from os import remove, urandom
 from shutil import copy2
+import getpass
 
 def salt_gen():
     salt_new = urandom(16)
@@ -65,7 +66,7 @@ def str_encrypt(str_in, key, opt):
 
 def master_pw(opt):
     while opt == "login":
-        key = key_pw(input("Enter Master Password to continue: "))
+        key = key_pw(getpass.getpass("Enter Master Password to continue: "))
         if key == key_read():
             print("Master Password correct!")
             break
@@ -88,12 +89,3 @@ if platform.startswith("linux"):
 elif platform.startswith("win32"):
     key_path = r"d:\py_prjs\.keys\pwmngr.key"
 salt_path = key_path.replace("pwmngr.key", "pwmngr.salt")
-
-
-# salt_gen()
-# key_write(key_pw("pw123"))
-# for i in range(10):
-#     pw_test = "password"+str(i)
-#     print(str_encrypt(pw_test, key_read(), "en"))
-# s_enc = str_encrypt("testing123$|", key_read(), "en")
-# print(s_enc)
