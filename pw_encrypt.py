@@ -1,16 +1,16 @@
-from cryptography.fernet import Fernet
+import base64
+import os
+from sys import platform
+from shutil import copy2
+from getpass import getpass
 
+from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from sys import platform
-import base64
-from os import remove, urandom
-from shutil import copy2
-import getpass
 
 def salt_gen():
-    salt_new = urandom(16)
+    salt_new = os.urandom(16)
     with open(salt_path, "wb") as f:
         f.write(salt_new)
 
@@ -66,7 +66,7 @@ def str_encrypt(str_in, key, opt):
 
 def master_pw(opt):
     while opt == "login":
-        key = key_pw(getpass.getpass("Enter Master Password to continue: "))
+        key = key_pw(getpass("Enter Master Password to continue: "))
         if key == key_read():
             print("Master Password correct!")
             break
@@ -82,10 +82,10 @@ def master_pw(opt):
         copy2(key_path, key_path+".old")
         key_write(key)
     elif opt == "del_old":
-        remove(key_path+".old")
+        os.remove(key_path+".old")
 
 if platform.startswith("linux"):
-    key_path = r"~/.keys/pwmngr.key"
+    key_path = os.path.expanduser("~/.keys/pwmngr.key")
 elif platform.startswith("win32"):
-    key_path = r"d:\py_prjs\.keys\pwmngr.key"
+    key_path = os.path.abspath(" /../../.keys/pwmngr.key")
 salt_path = key_path.replace("pwmngr.key", "pwmngr.salt")

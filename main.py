@@ -1,20 +1,19 @@
-# Python program to manage login passwords
-
 import pyperclip
-import sqlite3
-
-from pw_gen import pwgen, pwgen_custom
 import tldextract
+
+import sqlite3
+import os
 import argparse
 from shutil import copy2
-from pw_encrypt import key_read, master_pw, salt_gen, str_encrypt
-from os import remove
-
 from sys import platform
+
+from pw_gen import pwgen, pwgen_custom
+from pw_encrypt import key_read, master_pw, salt_gen, str_encrypt
+
 if platform.startswith("linux"):
-    db_path = r"~/.database/pwmngr.db"
+    db_path = os.path.expanduser("~/.database/pwmngr.db")
 elif platform.startswith("win32"):
-    db_path = r"d:\py_prjs\.database\pwmngr.db"
+    db_path = os.path.abspath(" /../../.database/pwmngr.db")
 conn = sqlite3.connect(db_path)
 
 parse = argparse.ArgumentParser()
@@ -81,7 +80,7 @@ def update_retrieve():
         print("Password copied to clipboard!")
     elif user_opt == "2" or user_opt == "3":
         if user_opt == "2": new_pw = pwgen()
-        else: new_pw = pwgen_custom()
+        else: new_pw = pwgen_custom(input("Input the symbols allowed: "))
         new_pw_enc = str_encrypt(new_pw, key_read(), "en")
         update_db(domain, new_pw_enc, "pw")
         pyperclip.copy(new_pw)
@@ -95,10 +94,6 @@ def update_retrieve():
             print(f"Database updated for {domain} (Note: {search_db(domain)['re']}), Login ID: {search_db(domain)['login']}")
     else:
         print("Error, please enter 1, 2 or 3.")
-
-def delete_db():
-    # add code here
-    return True
 
 
 print("***Python Password Manager***")
@@ -133,7 +128,7 @@ if curs.fetchone()[0]==1:       # if pwtable exist -> use master to login
         del all_dec
         conn.commit()
         # master_pw("del_old")    # delete the key.old
-        # remove(db_path+".old")
+        # os.remove(db_path+".old")
 else:               # if no, create a salt then master password and store the key
     salt_gen()
     master_pw("new")
