@@ -66,8 +66,7 @@ def search_db(url_in):
     if not row:
         return None
     else:
-        search_result = {"login":row[0], "re":row[1], "pw":str_encrypt(row[2], key_read(), "de")}
-        return search_result
+        return {"login":row[0], "re":row[1], "pw":str_encrypt(row[2], key_read(), "de")}
 
 def update_db(url_in, data_in, opt):
     curs = conn.cursor()
@@ -79,7 +78,19 @@ def update_db(url_in, data_in, opt):
         curs.execute("UPDATE pwtable SET remark = (?) WHERE url = (?)", (data_in, url_in))
     conn.commit()
 
-def update_retrieve():
+def new_entry(domain):
+    user_opt = input(f"New web site detected: {domain}\n(1)Create new entry, (Otherwise)Search again. ==> ")
+    if user_opt == "1":
+        new_login = input(f"Login id/email for {domain}: ")
+        new_remark = input(f"Additional note: ")
+        new_pw = pwgen()
+        pyperclip.copy(new_pw)
+        new_pw_enc = str_encrypt(new_pw, key_read(), "en")
+        insert_db(domain, new_login, new_remark, new_pw_enc)
+        print(f"New entry created for {domain}\nLogin & Password are: {new_login}:|  {new_pw}  | Password copied to clipboard!")
+
+def update_retrieve(s_result):
+    print(f"Record found. Login ID: {s_result['login']}  (Note: {s_result['re']}).")
     user_opt = input("(1)Retrieve password (2)Generate new password (3)OR custom password (4)Update database Login ID and note ==> ")
     if user_opt == "1":
         pyperclip.copy(s_result["pw"])
@@ -153,6 +164,7 @@ else:
 
 try:
     while True:
+        # Read and validate domain
         url_read = input("Enter url to search record/ press <enter> to read from clipboard/ <q> to quit:\n")
         if url_read == "q": break
         if url_read == "": url_read = pyperclip.paste()
@@ -161,21 +173,13 @@ try:
         if domain == "" or "." not in domain:
             print(f"Invalid URL detected: {domain}")
             continue
-        s_result = search_db(domain)
-        if not s_result: # new and create entry
-            user_opt = input(f"New web site detected: {domain}\n(1)Create new entry, (Otherwise)Search again. ==> ")
-            if user_opt == "1":
-                new_login = input(f"Login id/email for {domain}: ")
-                new_remark = input(f"Additional note: ")
-                new_pw = pwgen()
-                pyperclip.copy(new_pw)
-                new_pw_enc = str_encrypt(new_pw, key_read(), "en")
-                insert_db(domain, new_login, new_remark, new_pw_enc)
-                print(f"New entry created for {domain}\nLogin & Password are: {new_login}:|  {new_pw}  | Password copied to clipboard!")
-            else: continue
-        else: # old record found
-            print(f"Record found. Login ID: {s_result['login']}  (Note: {s_result['re']}).")
-            update_retrieve() # update or retrieve
+
+        # Create, retrieve or update password
+        result = search_db(domain)
+        if not result:
+            new_entry(domain)
+        else:
+            update_retrieve(result)
 except Exception as err:
     print("Exception: ", err)
 
