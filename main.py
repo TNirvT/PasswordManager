@@ -1,19 +1,25 @@
-import pyperclip
-import tldextract
-
-import sqlite3
+# Built-in
 import os
 import argparse
 from shutil import copy2
 from sys import platform
 
+# PIP
+import pyperclip
+import tldextract
+import sqlite3
+from cryptography.fernet import Fernet
+
+# Project
 from pw_gen import pwgen, pwgen_custom
-from pw_encrypt import key_read, master_pw, salt_gen, str_encrypt
+from pw_encrypt import key_read, salt_gen, str_encrypt, login, new_master_pw, change_master_pw
 
 if platform.startswith("linux"):
     db_path = os.path.expanduser("~/.database/pwmngr.db")
 elif platform.startswith("win32"):
     db_path = os.path.abspath(" /../../.database/pwmngr.db")
+else:
+    db_path = os.path.expanduser("~/.database/pwmngr.db")
 conn = sqlite3.connect(db_path)
 
 parse = argparse.ArgumentParser()
@@ -102,36 +108,39 @@ curs = conn.cursor()
 curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pwtable' ")
 if curs.fetchone()[0]==1:       # if pwtable exist -> use master to login
     conn.commit()
-    master_pw("login")
+    login()
     if input("Press <enter> to continue, or <Ch> to change master password: ") == "Ch":
-        copy2(db_path, db_path+".old")
+        # Make sure DB is unused before touching the file
         conn.close()
+        copy2(db_path, db_path+".old")
         
         conn = sqlite3.connect(db_path+".old")
         curs = conn.cursor()
         curs.execute("SELECT url, password FROM pwtable")
         all_rows = curs.fetchall()
         conn.commit()
-        all_dec = []
-        for i in all_rows:  # decrypt using existing key
-            data_de = str_encrypt(i[1], key_read(), "de")
-            all_dec += [(i[0], data_de)]     # i is a tuple, arbitrary assignment of its element is illegal
-        del all_rows
-        master_pw("change") # generate a new key using new master p/w
         conn.close()
+
+        all_dec = []
+        fernet = Fernet(key_read())
+        for row in all_rows:  # don't use 'i' for non-integer loop variable
+            data_dec = fernet.decrypt(row[1]).decode()
+            all_dec.append((row[0], data_dec))  # cannot modify i, arbitrary assignment of its element is illegal
+
+        change_master_pw() # generate a new key using new master p/w
         
+        fernet = Fernet(key_read())
+
         conn = sqlite3.connect(db_path)
-        for i in all_dec:  # re-encrypt the p/w column using new m_pw
-            data_en = str_encrypt(i[1], key_read(), "en")
-            i = (i[0], data_en)
-            update_db(i[0], i[1], "pw")
-        del all_dec
+        for row in all_dec:  # re-encrypt the p/w column using new pw
+            data_enc = fernet.encrypt(row[1].encode())
+            update_db(row[0], data_enc, "pw")
         conn.commit()
-        # master_pw("del_old")    # delete the key.old
-        # os.remove(db_path+".old")
+
+        os.remove(db_path+".old")
 else:               # if no, create a salt then master password and store the key
     salt_gen()
-    master_pw("new")
+    new_master_pw()
     
     curs = conn.cursor()
     curs.execute("""

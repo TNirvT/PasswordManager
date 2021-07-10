@@ -25,15 +25,22 @@ def key_read():
     f.close()
     return key
 
+# If possible, return as few implementation detail as possible
+def validate_key(key):
+    with open(key_path, "rb") as f:     # rb = read bytes
+        read_key = f.read()
+    f.close()
+    return read_key == key
+
 def key_random():
     key = Fernet.generate_key()
     return key
 
-def key_pw(pw_for_keygen):
+def pw_to_key(pw_for_keygen):
     password = pw_for_keygen.encode()
     with open(salt_path, "rb") as f:
         salt = f.read()
-    f.close
+    f.close()
     # salt = b'u\xbc\x17c\x8b\xff_\xc1\xc2go"\xa7\xa3}t'
     kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -64,28 +71,30 @@ def str_encrypt(str_in, key, opt):
         str_out = fernet.decrypt(str_in).decode()
     return str_out
 
-def master_pw(opt):
-    while opt == "login":
-        key = key_pw(getpass("Enter Master Password to continue: "))
-        if key == key_read():
+def login():
+    while True:
+        # pw_to_key is fine
+        # key_from_pw: key_from_X, key_from_Y
+        key = pw_to_key(getpass("Enter Master Password to continue: "))
+        if validate_key(key):
             print("Master Password correct!")
             break
         else:
             print("Incorrect password!")
             continue
-    if opt == "new":
-        key = key_pw(input("Create a new Master Password: "))
-        key_write(key)
-    elif opt == "change":
-        pw_in = input("Enter a New Master Password: ")
-        key = key_pw(pw_in)
-        copy2(key_path, key_path+".old")
-        key_write(key)
-    elif opt == "del_old":
-        os.remove(key_path+".old")
+
+def new_master_pw():
+    key = pw_to_key(input("Create a new Master Password: "))
+    key_write(key)
+
+def change_master_pw():
+    key = pw_to_key(getpass("Enter a new Master Password: "))
+    key_write(key)
 
 if platform.startswith("linux"):
     key_path = os.path.expanduser("~/.keys/pwmngr.key")
 elif platform.startswith("win32"):
     key_path = os.path.abspath(" /../../.keys/pwmngr.key")
+else:
+    key_path = os.path.expanduser("~/.keys/pwmngr.key")
 salt_path = key_path.replace("pwmngr.key", "pwmngr.salt")
