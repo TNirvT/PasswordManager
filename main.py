@@ -106,8 +106,21 @@ print("***Python Password Manager***")
 
 curs = conn.cursor()
 curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pwtable' ")
-if curs.fetchone()[0]==1:       # if pwtable exist -> use master to login
+if curs.fetchone()[0] == 0:
+    salt_gen()
+    new_master_pw()
+
+    curs = conn.cursor()
+    curs.execute("""
+        CREATE TABLE IF NOT EXISTS pwtable (
+        url text,
+        login text,
+        remark text,
+        password blob
+        )
+    """)
     conn.commit()
+else:
     login()
     if input("Press <enter> to continue, or <Ch> to change master password: ") == "Ch":
         # Make sure DB is unused before touching the file
@@ -118,7 +131,6 @@ if curs.fetchone()[0]==1:       # if pwtable exist -> use master to login
         curs = conn.cursor()
         curs.execute("SELECT url, password FROM pwtable")
         all_rows = curs.fetchall()
-        conn.commit()
         conn.close()
 
         all_dec = []
@@ -138,20 +150,6 @@ if curs.fetchone()[0]==1:       # if pwtable exist -> use master to login
         conn.commit()
 
         os.remove(db_path+".old")
-else:               # if no, create a salt then master password and store the key
-    salt_gen()
-    new_master_pw()
-    
-    curs = conn.cursor()
-    curs.execute("""
-        CREATE TABLE IF NOT EXISTS pwtable (
-        url text,
-        login text,
-        remark text,
-        password blob
-        )
-    """)
-    conn.commit()
 
 try:
     while True:
