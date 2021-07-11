@@ -14,7 +14,7 @@ from cryptography.fernet import Fernet
 
 # Project
 from pw_gen import pwgen, pwgen_custom
-from pw_encrypt import MasterKey
+from master_key import MasterKey
 
 if platform.startswith("win32"):
     db_path = os.path.abspath(" /../../.database/pwmngr.db")
