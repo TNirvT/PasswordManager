@@ -1,6 +1,8 @@
 # Built-in
-import os
 import argparse
+import os
+import traceback
+from getpass import getpass
 from shutil import copy2
 from sys import platform
 
@@ -12,23 +14,25 @@ from cryptography.fernet import Fernet
 
 # Project
 from pw_gen import pwgen, pwgen_custom
-from pw_encrypt import key_read, salt_gen, str_encrypt, login, new_master_pw, change_master_pw
+from pw_encrypt import MasterKey
 
-if platform.startswith("linux"):
-    db_path = os.path.expanduser("~/.database/pwmngr.db")
-elif platform.startswith("win32"):
+if platform.startswith("win32"):
     db_path = os.path.abspath(" /../../.database/pwmngr.db")
+    key_path = os.path.abspath(" /../../.keys/pwmngr.key")
 else:
     db_path = os.path.expanduser("~/.database/pwmngr.db")
+    key_path = os.path.expanduser("~/.keys/pwmngr.key")
+
+master_key = MasterKey(key_path)
 conn = sqlite3.connect(db_path)
 
 parse = argparse.ArgumentParser()
 parse.add_argument("--debug", action="store_true", help="Insert test data table to debug database.")
 args = parse.parse_args()
+
 #######################################
 ### data for debug only ###
-if args.debug:
-    conn.close()
+def insert_debug_data():
     db_path = "pwmngr_debug.db"
     conn = sqlite3.connect(db_path)
     curs = conn.cursor()
@@ -46,11 +50,32 @@ if args.debug:
         conn.commit()
 
     list1 = [
-        ("abc.com", "name@email.com", "", str_encrypt("pw_test1", key_read(), "en")),
-        ("testing.com", "name@email.com", "hahaha", str_encrypt("pw_test2", key_read(), "en")),
-        ("school.org", "myidno", "some notes", str_encrypt("pw_test3", key_read(), "en")),
+        ("abc.com", "name@email.com", "", master_key.encrypt("pw_test1")),
+        ("testing.com", "name@email.com", "hahaha", master_key.encrypt("pw_test2")),
+        ("school.org", "myidno", "some notes", master_key.encrypt("pw_test3")),
     ]
     inserts_db(list1)
+
+#######################################
+
+def unlock_master_key():
+    while True:
+        pw = getpass("Enter Master Password to continue: ")
+        if master_key.unlock(pw):
+            print("Master Password correct!")
+            break
+        else:
+            print("Incorrect password!")
+            continue
+
+def create_master_key():
+    pw = getpass("Create a new Master Password: ")
+    master_key.set_pw(pw)
+
+def change_master_pw():
+    pw = getpass("Enter a new Master Password: ")
+    master_key.set_pw(pw)
+
 #######################################
 
 def insert_db(url_in, login_in, remark_in, pw_in):
@@ -66,7 +91,7 @@ def search_db(url_in):
     if not row:
         return None
     else:
-        return {"login":row[0], "re":row[1], "pw":str_encrypt(row[2], key_read(), "de")}
+        return {"login":row[0], "re":row[1], "pw":master_key.decrypt(row[2])}
 
 def update_db(url_in, data_in, opt):
     curs = conn.cursor()
@@ -85,7 +110,7 @@ def new_entry(domain):
         new_remark = input(f"Additional note: ")
         new_pw = pwgen()
         pyperclip.copy(new_pw)
-        new_pw_enc = str_encrypt(new_pw, key_read(), "en")
+        new_pw_enc = master_key.encrypt(new_pw)
         insert_db(domain, new_login, new_remark, new_pw_enc)
         print(f"New entry created for {domain}\nLogin & Password are: {new_login}:|  {new_pw}  | Password copied to clipboard!")
 
@@ -98,7 +123,7 @@ def update_retrieve(s_result):
     elif user_opt == "2" or user_opt == "3":
         if user_opt == "2": new_pw = pwgen()
         else: new_pw = pwgen_custom(input("Input the symbols allowed: "))
-        new_pw_enc = str_encrypt(new_pw, key_read(), "en")
+        new_pw_enc = master_key.encrypt(new_pw)
         update_db(domain, new_pw_enc, "pw")
         pyperclip.copy(new_pw)
         print(f"Password for {domain} (Note: {s_result['re']}) updated and copied to clipboard!\nLogin & Password are: {s_result['login']}:|  {new_pw}  |")
@@ -115,12 +140,17 @@ def update_retrieve(s_result):
 
 print("***Python Password Manager***")
 
+if master_key.exists():
+    unlock_master_key()
+else:
+    create_master_key()
+
+if args.debug:
+    insert_debug_data()
+
 curs = conn.cursor()
 curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pwtable' ")
 if curs.fetchone()[0] == 0:
-    salt_gen()
-    new_master_pw()
-
     curs = conn.cursor()
     curs.execute("""
         CREATE TABLE IF NOT EXISTS pwtable (
@@ -132,7 +162,6 @@ if curs.fetchone()[0] == 0:
     """)
     conn.commit()
 else:
-    login()
     if input("Press <enter> to continue, or <Ch> to change master password: ") == "Ch":
         # Make sure DB is unused before touching the file
         conn.close()
@@ -145,18 +174,15 @@ else:
         conn.close()
 
         all_dec = []
-        fernet = Fernet(key_read())
         for row in all_rows:  # don't use 'i' for non-integer loop variable
-            data_dec = fernet.decrypt(row[1]).decode()
+            data_dec = master_key.decrypt(row[1])
             all_dec.append((row[0], data_dec))  # cannot modify i, arbitrary assignment of its element is illegal
 
         change_master_pw() # generate a new key using new master p/w
-        
-        fernet = Fernet(key_read())
 
         conn = sqlite3.connect(db_path)
         for row in all_dec:  # re-encrypt the p/w column using new pw
-            data_enc = fernet.encrypt(row[1].encode())
+            data_enc = master_key.encrypt(row[1])
             update_db(row[0], data_enc, "pw")
         conn.commit()
 
@@ -181,6 +207,6 @@ try:
         else:
             update_retrieve(result)
 except Exception as err:
-    print("Exception: ", err)
+    traceback.print_exc()
 
 conn.close()
