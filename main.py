@@ -1,27 +1,26 @@
 # Built-in
 import argparse
-import os
+from os import remove, path
 import traceback
 from getpass import getpass
-from shutil import copy2
+from shutil import copy
 from sys import platform
 
 # PIP
 import pyperclip
 import tldextract
 import sqlite3
-from cryptography.fernet import Fernet
 
 # Project
-from pw_gen import pwgen, pwgen_custom
+from pw_gen import pwgen
 from master_key import MasterKey
 
 if platform.startswith("win32"):
-    db_path = os.path.abspath(" /../../.database/pwmngr.db")
-    key_path = os.path.abspath(" /../../.keys/pwmngr.key")
+    db_path = path.abspath("/.database/pwmngr.db")
+    key_path = path.abspath("/.keys/pwmngr.key")
 else:
-    db_path = os.path.expanduser("~/.database/pwmngr.db")
-    key_path = os.path.expanduser("~/.keys/pwmngr.key")
+    db_path = path.expanduser("~/.database/pwmngr.db")
+    key_path = path.expanduser("~/.keys/pwmngr.key")
 
 master_key = MasterKey(key_path)
 conn = sqlite3.connect(db_path)
@@ -37,22 +36,23 @@ def insert_debug_data():
     conn = sqlite3.connect(db_path)
     curs = conn.cursor()
     curs.execute("""
-        CREATE TABLE IF NOT EXISTS pwtable (
-        url text,
-        login text,
-        remark text,
-        password blob
+        CREATE TABLE IF NOT EXISTS pass_record (
+        id INTEGER PRIMARY KEY
+        url TEXT,
+        login TEXT,
+        remark TEXT,
+        password BLOB
         )
     """)
     def inserts_db(list_in):
         curs = conn.cursor()
-        curs.executemany("INSERT INTO pwtable VALUES (?,?,?,?)", list_in)
+        curs.executemany("INSERT INTO pass_record VALUES (?,?,?,?,?)", list_in)
         conn.commit()
 
     list1 = [
-        ("abc.com", "name@email.com", "", master_key.encrypt("pw_test1")),
-        ("testing.com", "name@email.com", "hahaha", master_key.encrypt("pw_test2")),
-        ("school.org", "myidno", "some notes", master_key.encrypt("pw_test3")),
+        (1001, "abc.com", "name@email.com", "", master_key.encrypt("pw_test1")),
+        (1002, "testing.com", "name@email.com", "hahaha", master_key.encrypt("pw_test2")),
+        (1003, "school.org", "myidno", "some notes", master_key.encrypt("pw_test3")),
     ]
     inserts_db(list1)
 
@@ -80,14 +80,18 @@ def change_master_pw():
 
 def insert_db(url_in, login_in, remark_in, pw_in):
     curs = conn.cursor()
-    curs.execute("INSERT INTO pwtable VALUES (?,?,?,?)", (url_in, login_in, remark_in, pw_in))
+    curs.execute("SELECT id FROM pass_record ORDER BY id DESC")
+    row = curs.fetchone()
+    conn.commit()
+    id_in = row[0][0]+1
+    curs = conn.cursor()
+    curs.execute("INSERT INTO pass_record VALUES (?,?,?,?,?)", (id_in, url_in, login_in, remark_in, pw_in))
     conn.commit()
 
 def search_db(url_in):
     curs = conn.cursor()
-    curs.execute("SELECT login, remark, password FROM pwtable WHERE url = (?)", (url_in,))
+    curs.execute("SELECT login, remark, password FROM pass_record WHERE url = (?)", (url_in,))
     row = curs.fetchone()
-    conn.commit()
     if not row:
         return None
     else:
@@ -96,11 +100,11 @@ def search_db(url_in):
 def update_db(url_in, data_in, opt):
     curs = conn.cursor()
     if opt == "pw":
-        curs.execute("UPDATE pwtable SET password = (?) WHERE url = (?)", (data_in, url_in))
+        curs.execute("UPDATE pass_record SET password = (?) WHERE url = (?)", (data_in, url_in))
     elif opt == "log":
-        curs.execute("UPDATE pwtable SET login = (?) WHERE url = (?)", (data_in, url_in))
+        curs.execute("UPDATE pass_record SET login = (?) WHERE url = (?)", (data_in, url_in))
     elif opt == "re":
-        curs.execute("UPDATE pwtable SET remark = (?) WHERE url = (?)", (data_in, url_in))
+        curs.execute("UPDATE pass_record SET remark = (?) WHERE url = (?)", (data_in, url_in))
     conn.commit()
 
 def new_entry(domain):
@@ -122,7 +126,7 @@ def update_retrieve(s_result):
         print("Password copied to clipboard!")
     elif user_opt == "2" or user_opt == "3":
         if user_opt == "2": new_pw = pwgen()
-        else: new_pw = pwgen_custom(input("Input the symbols allowed: "))
+        else: new_pw = pwgen(getpass("Input the symbols allowed /directly input a password: "))
         new_pw_enc = master_key.encrypt(new_pw)
         update_db(domain, new_pw_enc, "pw")
         pyperclip.copy(new_pw)
@@ -149,15 +153,16 @@ if args.debug:
     insert_debug_data()
 
 curs = conn.cursor()
-curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pwtable' ")
+curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pass_record' ")
 if curs.fetchone()[0] == 0:
     curs = conn.cursor()
     curs.execute("""
-        CREATE TABLE IF NOT EXISTS pwtable (
-        url text,
-        login text,
-        remark text,
-        password blob
+        CREATE TABLE IF NOT EXISTS pass_record (
+        id INTEGER PRIMARY KEY,
+        url TEXT,
+        login TEXT,
+        remark TEXT,
+        password BLOB
         )
     """)
     conn.commit()
@@ -165,18 +170,18 @@ else:
     if input("Press <enter> to continue, or <Ch> to change master password: ") == "Ch":
         # Make sure DB is unused before touching the file
         conn.close()
-        copy2(db_path, db_path+".old")
+        copy(db_path, db_path+".old")
         
         conn = sqlite3.connect(db_path+".old")
         curs = conn.cursor()
-        curs.execute("SELECT url, password FROM pwtable")
+        curs.execute("SELECT url, password FROM pass_record")
         all_rows = curs.fetchall()
         conn.close()
 
         all_dec = []
         for row in all_rows:  # don't use 'i' for non-integer loop variable
             data_dec = master_key.decrypt(row[1])
-            all_dec.append((row[0], data_dec))  # cannot modify i, arbitrary assignment of its element is illegal
+            all_dec.append((row[0], data_dec))  # cannot modify row, arbitrary assignment of its element is illegal
 
         change_master_pw() # generate a new key using new master p/w
 
@@ -186,7 +191,7 @@ else:
             update_db(row[0], data_enc, "pw")
         conn.commit()
 
-        os.remove(db_path+".old")
+        remove(db_path+".old")
 
 try:
     while True:

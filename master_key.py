@@ -1,5 +1,5 @@
 import base64
-import os
+from os import urandom
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -27,7 +27,7 @@ class MasterKey:
         return valid
 
     def set_pw(self, pw):
-        self.salt = os.urandom(16)
+        self.salt = urandom(16)
         with open(self.salt_path, "wb") as f:
             f.write(self.salt)
 
@@ -42,10 +42,10 @@ class MasterKey:
             raise Exception('MasterKey is not unlocked')
         return self.fernet.encrypt(str.encode())
 
-    def decrypt(self, str):
+    def decrypt(self, bytes):
         if self.fernet is None:
             raise Exception('MasterKey is not unlocked')
-        return self.fernet.decrypt(str).decode()
+        return self.fernet.decrypt(bytes).decode()
 
     def __pw_to_key(self, pw):
         kdf = PBKDF2HMAC(
