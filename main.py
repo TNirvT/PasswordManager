@@ -5,11 +5,11 @@ import traceback
 from getpass import getpass
 from shutil import copy
 from sys import platform
+import sqlite3
 
 # PIP
 import pyperclip
 import tldextract
-import sqlite3
 
 # Project
 from pw_gen import pwgen

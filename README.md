@@ -1,13 +1,12 @@
 # Password_Manager
 Python Password Manager project
 
+Pip install:
+cryptogtaphy (encryption library)
+pyperclip (clipboard library)
+tldextract (top level domain extract library)
+
 2021-06-19 Initialize
 2021-06-22 Basic functions completed
 2021-06-25 Modified password generator
-
-
-Things to do:
-Add function to delete existing entry
-Encryption
-Master password to unlock
-UI
+2021-07-23 Added requirements.txt
