@@ -79,18 +79,15 @@ def change_master_pw():
 
 def insert_db(url_in, login_in, remark_in, pw_in):
     curs = conn.cursor()
-    curs.execute("SELECT id FROM pass_record ORDER BY id DESC")
-    row = curs.fetchone()
+    curs.execute("INSERT INTO pass_record VALUES (NULL,?,?,?,?)", (url_in, login_in, remark_in, pw_in,))
     conn.commit()
-    id_in = row[0][0]+1
-    curs = conn.cursor()
-    curs.execute("INSERT INTO pass_record VALUES (?,?,?,?,?)", (id_in, url_in, login_in, remark_in, pw_in))
-    conn.commit()
+    curs.close()
 
 def search_db(url_in):
     curs = conn.cursor()
     curs.execute("SELECT login, remark, password FROM pass_record WHERE url = (?)", (url_in,))
     row = curs.fetchone()
+    curs.close()
     if not row:
         return None
     else:
@@ -105,13 +102,14 @@ def update_db(url_in, data_in, opt):
     elif opt == "re":
         curs.execute("UPDATE pass_record SET remark = (?) WHERE url = (?)", (data_in, url_in))
     conn.commit()
+    curs.close()
 
 def new_entry(domain):
     user_opt = input(f"New web site detected: {domain}\n(1)Create new entry, (Otherwise)Search again. ==> ")
     if user_opt == "1":
         new_login = input(f"Login id/email for {domain}: ")
-        new_remark = input(f"Additional note: ")
-        new_pw = pwgen()
+        new_remark = input("Additional note: ")
+        new_pw = pwgen(getpass("Password: "))
         pyperclip.copy(new_pw)
         new_pw_enc = master_key.encrypt(new_pw)
         insert_db(domain, new_login, new_remark, new_pw_enc)
@@ -141,7 +139,7 @@ def update_retrieve(s_result):
         print("Error, please enter 1, 2 or 3.")
 
 
-print("***Python Password Manager***")
+print("***Python CL Password Manager***")
 
 if master_key.exists():
     unlock_master_key()
@@ -154,20 +152,21 @@ if args.debug:
 curs = conn.cursor()
 curs.execute("SELECT count(name) FROM sqlite_master WHERE type= 'table' AND name='pass_record' ")
 if curs.fetchone()[0] == 0:
-    curs = conn.cursor()
     curs.execute("""
         CREATE TABLE IF NOT EXISTS pass_record (
         id INTEGER PRIMARY KEY,
-        url TEXT,
-        login TEXT,
+        url TEXT NOT NULL,
+        login TEXT NOT NULL,
         remark TEXT,
         password BLOB
         )
     """)
     conn.commit()
+    curs.close()
 else:
     if input("Press <enter> to continue, or <Ch> to change master password: ") == "Ch":
         # Make sure DB is unused before touching the file
+        curs.close()
         conn.close()
         copy(db_path, db_path+".old")
         
@@ -175,6 +174,7 @@ else:
         curs = conn.cursor()
         curs.execute("SELECT url, password FROM pass_record")
         all_rows = curs.fetchall()
+        curs.close()
         conn.close()
 
         all_dec = []
