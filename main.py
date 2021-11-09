@@ -1,10 +1,10 @@
 # Built-in
 import argparse
-from os import remove, path
+from os import remove
+from pathlib import Path
 import traceback
 from getpass import getpass
 from shutil import copy
-from sys import platform
 import sqlite3
 
 # PIP
@@ -15,12 +15,11 @@ import tldextract
 from pw_gen import pwgen
 from master_key import MasterKey
 
-if platform.startswith("win32"):
-    db_path = path.abspath("/.database/pwmngr.db")
-    key_path = path.abspath("/.keys/pwmngr.key")
-else:
-    db_path = path.expanduser("~/.database/pwmngr.db")
-    key_path = path.expanduser("~/.keys/pwmngr.key")
+secret_dir = Path.cwd() / ".secret"
+if not secret_dir.is_dir():
+    Path.mkdir(secret_dir)
+db_path = secret_dir / "pwmngr.db"
+key_path = secret_dir / "pwmngr.key"
 
 master_key = MasterKey(key_path)
 conn = sqlite3.connect(db_path)

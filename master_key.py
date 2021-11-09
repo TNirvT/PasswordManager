@@ -8,9 +8,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class MasterKey:
-    def __init__(self, key_path):
+    def __init__(self, key_path: Path):
         self.key_path = key_path
-        self.salt_path = key_path + ".salt"
+        self.salt_path = key_path.parent / "pwmngr.salt"
 
     def exists(self):
         return Path(self.key_path).is_file() and Path(self.salt_path).is_file()
