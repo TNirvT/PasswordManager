@@ -122,7 +122,7 @@ def update_retrieve(s_result):
         pyperclip.copy(s_result["pw"])
         print("Password copied to clipboard!")
     elif user_opt == "2" or user_opt == "3":
-        if user_opt == "2": new_pw = pwgen()
+        if user_opt == "2": new_pw = pwgen("")
         else: new_pw = pwgen(getpass("Input the symbols allowed /directly input a password: "))
         new_pw_enc = master_key.encrypt(new_pw)
         update_db(domain, new_pw_enc, "pw")
